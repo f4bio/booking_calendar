@@ -1,22 +1,29 @@
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:booking_calendar/booking_calendar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+final themeModeProvider = StateProvider((ref) => ThemeMode.light);
+
 void main() {
-  initializeDateFormatting()
-      .then((_) => runApp(const BookingCalendarDemoApp()));
+  initializeDateFormatting().then(
+      (_) => runApp(const ProviderScope(child: BookingCalendarDemoApp())));
 }
 
-class BookingCalendarDemoApp extends StatefulWidget {
+class BookingCalendarDemoApp extends ConsumerStatefulWidget {
   const BookingCalendarDemoApp({Key? key}) : super(key: key);
 
   @override
-  State<BookingCalendarDemoApp> createState() => _BookingCalendarDemoAppState();
+  ConsumerState<ConsumerStatefulWidget> createState() =>
+      _BookingCalendarDemoAppState();
 }
 
-class _BookingCalendarDemoAppState extends State<BookingCalendarDemoApp> {
+class _BookingCalendarDemoAppState
+    extends ConsumerState<BookingCalendarDemoApp> {
   final now = DateTime.now();
-  late BookingService mockBookingService;
+  late final BookingService mockBookingService;
+  late final BookingController mockBookingController;
 
   @override
   void initState() {
@@ -24,50 +31,103 @@ class _BookingCalendarDemoAppState extends State<BookingCalendarDemoApp> {
     // DateTime.now().startOfDay
     // DateTime.now().endOfDay
     mockBookingService = BookingService(
-        serviceName: 'Mock Service',
-        serviceDuration: 30,
-        bookingEnd: DateTime(now.year, now.month, now.day, 18, 0),
-        bookingStart: DateTime(now.year, now.month, now.day, 8, 0));
+      serviceName: 'Mock Service',
+      serviceDuration: 60,
+      bookingStart: DateTime(2024, 8, 18, 10, 0), // 10:00 AM
+      bookingEnd: DateTime(2024, 8, 18, 11, 0), // 11:00 AM
+    );
+
+    mockBookingController = BookingController(
+        serviceOpening: DateTime(2023, 8, 18, 8, 0), // 08:00 AM
+        serviceClosing: DateTime(2023, 8, 18, 20, 0), // 05:00 PM
+
+        bookingService: mockBookingService,
+        pauseSlots: generatePauseSlots());
   }
 
   Stream<dynamic>? getBookingStreamMock(
       {required DateTime end, required DateTime start}) {
-    return Stream.value([]);
+    // Mock data
+    final bookings = [
+      {
+        'bookingStart': "2023-10-15T10:00:00.000+08:00",
+        'bookingEnd':
+            "2023-10-15T11:00:00.000+08:00", // Just an example for the end time
+      },
+
+      // ... add more mock bookings as needed
+      {
+        'bookingStart': "2023-08-28T12:00:00.000+00:00",
+        'bookingEnd':
+            "2023-08-28T13:00:00.000+00:00", // Just an example for the end time
+      }
+    ];
+
+    return Stream.value(bookings);
   }
 
-  Future<dynamic> uploadBookingMock(
+  Future<dynamic> onBookSelected(BuildContext context,
       {required BookingService newBooking}) async {
-    await Future.delayed(const Duration(seconds: 1));
-    converted.add(DateTimeRange(
-        start: newBooking.bookingStart, end: newBooking.bookingEnd));
-    print('${newBooking.toJson()} has been uploaded');
+    // await Future.delayed(const Duration(seconds: 1));
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Booking Created'),
+          content: const Text('Your booking was successfully created.'),
+          actions: <Widget>[
+            OutlinedButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+      );
+    }
+    if (newBooking.bookingStart != null && newBooking.bookingEnd != null) {
+      converted.add(DateTimeRange(
+          start: newBooking.bookingStart!, end: newBooking.bookingEnd!));
+      print('${newBooking.toJson()} has been uploaded');
+      setState(() {});
+    }
   }
 
   List<DateTimeRange> converted = [];
 
   List<DateTimeRange> convertStreamResultMock({required dynamic streamResult}) {
+    for (var booking in streamResult) {
+      DateTime start = DateTime.parse(booking['bookingStart'] as String);
+      DateTime end = DateTime.parse(booking['bookingEnd'] as String);
+      converted.add(DateTimeRange(start: start, end: end));
+    }
+
+    return converted;
+
     ///here you can parse the streamresult and convert to [List<DateTimeRange>]
     ///take care this is only mock, so if you add today as disabledDays it will still be visible on the first load
     ///disabledDays will properly work with real data
-    DateTime first = now;
-    DateTime tomorrow = now.add(const Duration(days: 1));
-    DateTime second = now.add(const Duration(minutes: 55));
-    DateTime third = now.subtract(const Duration(minutes: 240));
-    DateTime fourth = now.subtract(const Duration(minutes: 500));
-    converted.add(
-        DateTimeRange(start: first, end: now.add(const Duration(minutes: 30))));
-    converted.add(DateTimeRange(
-        start: second, end: second.add(const Duration(minutes: 23))));
-    converted.add(DateTimeRange(
-        start: third, end: third.add(const Duration(minutes: 15))));
-    converted.add(DateTimeRange(
-        start: fourth, end: fourth.add(const Duration(minutes: 50))));
+    // DateTime first = now;
+    // DateTime tomorrow = now.add(Duration(days: 1));
+    // DateTime second = now.add(const Duration(minutes: 55));
+    // DateTime third = now.subtract(const Duration(minutes: 240));
+    // DateTime fourth = now.subtract(const Duration(minutes: 500));
+    // converted.add(
+    //     DateTimeRange(start: first, end: now.add(const Duration(minutes: 30))));
+    // converted.add(DateTimeRange(
+    //     start: second, end: second.add(const Duration(minutes: 23))));
+    // converted.add(DateTimeRange(
+    //     start: third, end: third.add(const Duration(minutes: 15))));
+    // converted.add(DateTimeRange(
+    //     start: fourth, end: fourth.add(const Duration(minutes: 50))));
 
-    //book whole day example
-    converted.add(DateTimeRange(
-        start: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 5, 0),
-        end: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 23, 0)));
-    return converted;
+    // //book whole day example
+    // converted.add(DateTimeRange(
+    //     start: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 5, 0),
+    //     end: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 23, 0)));
+    // return converted;
   }
 
   List<DateTimeRange> generatePauseSlots() {
@@ -80,34 +140,94 @@ class _BookingCalendarDemoAppState extends State<BookingCalendarDemoApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
         title: 'Booking Calendar Demo',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
+        // This theme was made for FlexColorScheme version 6.1.1. Make sure
+// you use same or higher version, but still same major version. If
+// you use a lower version, some properties may not be supported. In
+// that case you can also remove them after copying the theme to your app.
+        theme: FlexThemeData.light(
+          scheme: FlexScheme.blue,
+          surfaceMode: FlexSurfaceMode.highScaffoldLevelSurface,
+          blendLevel: 3,
+          subThemesData: const FlexSubThemesData(
+            blendOnLevel: 10,
+            blendOnColors: false,
+            elevatedButtonRadius: 8.0,
+            elevatedButtonSchemeColor: SchemeColor.onPrimary,
+            elevatedButtonSecondarySchemeColor: SchemeColor.primary,
+            outlinedButtonRadius: 8.0,
+            outlinedButtonOutlineSchemeColor: SchemeColor.primary,
+          ),
+          visualDensity: FlexColorScheme.comfortablePlatformDensity,
+          useMaterial3: true,
+          swapLegacyOnMaterial3: true,
+          // To use the playground font, add GoogleFonts package and uncomment
+          // fontFamily: GoogleFonts.notoSans().fontFamily,
         ),
-        home: Scaffold(
-          appBar: AppBar(
-            title: const Text('Booking Calendar Demo'),
+        darkTheme: FlexThemeData.dark(
+          scheme: FlexScheme.blue,
+          surfaceMode: FlexSurfaceMode.highScaffoldLevelSurface,
+          blendLevel: 4,
+          subThemesData: const FlexSubThemesData(
+            blendOnLevel: 25,
+            elevatedButtonRadius: 8.0,
+            elevatedButtonSchemeColor: SchemeColor.onPrimary,
+            elevatedButtonSecondarySchemeColor: SchemeColor.primary,
+            outlinedButtonRadius: 8.0,
+            outlinedButtonOutlineSchemeColor: SchemeColor.primary,
           ),
-          body: Center(
-            child: BookingCalendar(
-              bookingService: mockBookingService,
-              convertStreamResultToDateTimeRanges: convertStreamResultMock,
-              getBookingStream: getBookingStreamMock,
-              uploadBooking: uploadBookingMock,
-              pauseSlots: generatePauseSlots(),
-              pauseSlotText: 'LUNCH',
-              hideBreakTime: false,
-              loadingWidget: const Text('Fetching data...'),
-              uploadingWidget: const CircularProgressIndicator(),
-              locale: 'hu_HU',
-              startingDayOfWeek: StartingDayOfWeek.tuesday,
-              wholeDayIsBookedWidget:
-                  const Text('Sorry, for this day everything is booked'),
-              //disabledDates: [DateTime(2023, 1, 20)],
-              //disabledDays: [6, 7],
+          visualDensity: FlexColorScheme.comfortablePlatformDensity,
+          useMaterial3: true,
+          swapLegacyOnMaterial3: true,
+          // To use the Playground font, add GoogleFonts package and uncomment
+          // fontFamily: GoogleFonts.notoSans().fontFamily,
+        ),
+        themeMode: themeMode,
+        // To avoid error of MaterialLocalizations because we are going to
+        // show a Dialog in the `onBookSelected` functions
+        home: Builder(builder: (context) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Booking Calendar Demo'),
+              actions: [
+                IconButton(
+                    onPressed: () {
+                      ref.read(themeModeProvider.notifier).state =
+                          themeMode == ThemeMode.dark
+                              ? ThemeMode.light
+                              : ThemeMode.dark;
+                    },
+                    icon: Icon(
+                      themeMode == ThemeMode.dark
+                          ? Icons.light_mode
+                          : Icons.dark_mode,
+                    ))
+              ],
             ),
-          ),
-        ));
+            body: Center(
+              child: BookingCalendar(
+                controller: mockBookingController,
+                convertStreamResultToDateTimeRanges: convertStreamResultMock,
+                getBookingStream: getBookingStreamMock,
+                onBookChange: (BookingService newBooking) async {
+                  await onBookSelected(context, newBooking: newBooking);
+                },
+                // pauseSlots: ,
+                pauseSlotText: 'LUNCH',
+                hideBreakTime: false,
+                loadingWidget: const Text('Fetching data...'),
+                // uploadingWidget: const CircularProgressIndicator(),
+                // locale: 'hu_HU',
+                startingDayOfWeek: StartingDayOfWeek.tuesday,
+                wholeDayIsBookedWidget:
+                    const Text('Sorry, for this day everything is booked'),
+                //disabledDates: [DateTime(2023, 1, 20)],
+                // disabledDays: [6, 7],
+              ),
+            ),
+          );
+        }));
   }
 }

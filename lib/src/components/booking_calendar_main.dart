@@ -1,3 +1,4 @@
+import 'package:booking_calendar/src/util/custom_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -8,52 +9,51 @@ import '../core/booking_controller.dart';
 import '../model/booking_service.dart';
 import '../model/enums.dart' as bc;
 import '../util/booking_util.dart';
-import 'booking_dialog.dart';
 import 'booking_explanation.dart';
 import 'booking_slot.dart';
-import 'common_button.dart';
 import 'common_card.dart';
 
 class BookingCalendarMain extends StatefulWidget {
-  const BookingCalendarMain({
-    Key? key,
-    required this.getBookingStream,
-    required this.convertStreamResultToDateTimeRanges,
-    required this.uploadBooking,
-    this.bookingExplanation,
-    this.bookingGridCrossAxisCount,
-    this.bookingGridChildAspectRatio,
-    this.formatDateTime,
-    this.bookingButtonText,
-    this.bookingButtonColor,
-    this.bookedSlotColor,
-    this.selectedSlotColor,
-    this.availableSlotColor,
-    this.bookedSlotText,
-    this.bookedSlotTextStyle,
-    this.selectedSlotText,
-    this.selectedSlotTextStyle,
-    this.availableSlotText,
-    this.availableSlotTextStyle,
-    this.gridScrollPhysics,
-    this.loadingWidget,
-    this.errorWidget,
-    this.uploadingWidget,
-    this.wholeDayIsBookedWidget,
-    this.pauseSlotColor,
-    this.pauseSlotText,
-    this.hideBreakTime = false,
-    this.locale,
-    this.startingDayOfWeek,
-    this.disabledDays,
-    this.disabledDates,
-    this.lastDay,
-  }) : super(key: key);
+  const BookingCalendarMain(
+      {Key? key,
+      required this.getBookingStream,
+      required this.convertStreamResultToDateTimeRanges,
+      this.onBookChange,
+      this.bookingExplanation,
+      this.bookingGridCrossAxisCount,
+      this.bookingGridChildAspectRatio,
+      this.formatDateTime,
+      this.calendarBackgroundColor,
+      this.bookingButtonText,
+      this.bookingButtonColor,
+      this.bookedSlotColor,
+      this.selectedSlotColor,
+      this.availableSlotColor,
+      this.bookedSlotText,
+      this.bookedSlotTextStyle,
+      this.selectedSlotText,
+      this.selectedSlotTextStyle,
+      this.availableSlotText,
+      this.availableSlotTextStyle,
+      this.gridScrollPhysics,
+      this.loadingWidget,
+      this.errorWidget,
+      // this.uploadingWidget,
+      this.wholeDayIsBookedWidget,
+      this.pauseSlotColor,
+      this.pauseSlotText,
+      this.hideBreakTime = false,
+      this.locale,
+      this.startingDayOfWeek,
+      this.disabledDays,
+      this.disabledDates,
+      this.lastDay,
+      this.calendarStyle})
+      : super(key: key);
 
   final Stream<dynamic>? Function(
       {required DateTime start, required DateTime end}) getBookingStream;
-  final Future<dynamic> Function({required BookingService newBooking})
-      uploadBooking;
+  final Future<void> Function(BookingService newBooking)? onBookChange;
   final List<DateTimeRange> Function({required dynamic streamResult})
       convertStreamResultToDateTimeRanges;
 
@@ -68,6 +68,7 @@ class BookingCalendarMain extends StatefulWidget {
   final Color? selectedSlotColor;
   final Color? availableSlotColor;
   final Color? pauseSlotColor;
+  final Color? calendarBackgroundColor;
 
 //Added optional TextStyle to available, booked and selected cards.
   final String? bookedSlotText;
@@ -82,7 +83,7 @@ class BookingCalendarMain extends StatefulWidget {
   final ScrollPhysics? gridScrollPhysics;
   final Widget? loadingWidget;
   final Widget? errorWidget;
-  final Widget? uploadingWidget;
+  // final Widget? uploadingWidget;
 
   final bool? hideBreakTime;
   final DateTime? lastDay;
@@ -92,6 +93,8 @@ class BookingCalendarMain extends StatefulWidget {
   final List<DateTime>? disabledDates;
 
   final Widget? wholeDayIsBookedWidget;
+
+  final CalendarStyle? calendarStyle;
 
   @override
   State<BookingCalendarMain> createState() => _BookingCalendarMainState();
@@ -107,8 +110,8 @@ class _BookingCalendarMainState extends State<BookingCalendarMain> {
     controller = context.read<BookingController>();
     final firstDay = calculateFirstDay();
 
-    startOfDay = firstDay.startOfDayService(controller.serviceOpening!);
-    endOfDay = firstDay.endOfDayService(controller.serviceClosing!);
+    startOfDay = firstDay.startOfDayService(controller.serviceOpening);
+    endOfDay = firstDay.endOfDayService(controller.serviceClosing);
     _focusedDay = firstDay;
     _selectedDay = firstDay;
     controller.selectFirstDayByHoliday(startOfDay, endOfDay);
@@ -122,10 +125,10 @@ class _BookingCalendarMainState extends State<BookingCalendarMain> {
   late DateTime endOfDay;
 
   void selectNewDateRange() {
-    startOfDay = _selectedDay.startOfDayService(controller.serviceOpening!);
+    startOfDay = _selectedDay.startOfDayService(controller.serviceOpening);
     endOfDay = _selectedDay
         .add(const Duration(days: 1))
-        .endOfDayService(controller.serviceClosing!);
+        .endOfDayService(controller.serviceClosing);
 
     controller.base = startOfDay;
     controller.resetSelectedSlot();
@@ -153,204 +156,232 @@ class _BookingCalendarMainState extends State<BookingCalendarMain> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     controller = context.watch<BookingController>();
 
     return Consumer<BookingController>(
       builder: (_, controller, __) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: (controller.isUploading)
-            ? widget.uploadingWidget ?? const BookingDialog()
-            : Column(
-                children: [
-                  CommonCard(
-                    child: TableCalendar(
-                      startingDayOfWeek: widget.startingDayOfWeek?.toTC() ??
-                          tc.StartingDayOfWeek.monday,
-                      holidayPredicate: (day) {
-                        if (widget.disabledDates == null) return false;
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: CommonCard(
+                color: widget.calendarBackgroundColor,
+                child: TableCalendar(
+                  startingDayOfWeek: widget.startingDayOfWeek?.toTC() ??
+                      tc.StartingDayOfWeek.monday,
+                  holidayPredicate: (day) {
+                    if (widget.disabledDates == null) return false;
 
-                        bool isHoliday = false;
-                        for (var holiday in widget.disabledDates!) {
-                          if (isSameDay(day, holiday)) {
-                            isHoliday = true;
-                          }
-                        }
-                        return isHoliday;
-                      },
-                      enabledDayPredicate: (day) {
-                        if (widget.disabledDays == null &&
-                            widget.disabledDates == null) return true;
+                    bool isHoliday = false;
+                    for (var holiday in widget.disabledDates!) {
+                      if (isSameDay(day, holiday)) {
+                        isHoliday = true;
+                      }
+                    }
+                    return isHoliday;
+                  },
+                  enabledDayPredicate: (day) {
+                    if (widget.disabledDays == null &&
+                        widget.disabledDates == null) return true;
 
-                        bool isEnabled = true;
-                        if (widget.disabledDates != null) {
-                          for (var holiday in widget.disabledDates!) {
-                            if (isSameDay(day, holiday)) {
-                              isEnabled = false;
-                            }
-                          }
-                          if (!isEnabled) return false;
+                    bool isEnabled = true;
+                    if (widget.disabledDates != null) {
+                      for (var holiday in widget.disabledDates!) {
+                        if (isSameDay(day, holiday)) {
+                          isEnabled = false;
                         }
-                        if (widget.disabledDays != null) {
-                          isEnabled =
-                              !widget.disabledDays!.contains(day.weekday);
-                        }
+                      }
+                      if (!isEnabled) return false;
+                    }
+                    if (widget.disabledDays != null) {
+                      isEnabled = !widget.disabledDays!.contains(day.weekday);
+                    }
 
-                        return isEnabled;
-                      },
-                      locale: widget.locale,
-                      firstDay: calculateFirstDay(),
-                      lastDay: widget.lastDay ??
-                          DateTime.now().add(const Duration(days: 1000)),
-                      focusedDay: _focusedDay,
-                      calendarFormat: _calendarFormat,
-                      calendarStyle:
-                          const CalendarStyle(isTodayHighlighted: true),
-                      selectedDayPredicate: (day) {
-                        return isSameDay(_selectedDay, day);
-                      },
-                      onDaySelected: (selectedDay, focusedDay) {
-                        if (!isSameDay(_selectedDay, selectedDay)) {
-                          setState(() {
-                            _selectedDay = selectedDay;
-                            _focusedDay = focusedDay;
-                          });
-                          selectNewDateRange();
-                        }
-                      },
-                      onFormatChanged: (format) {
-                        if (_calendarFormat != format) {
-                          setState(() {
-                            _calendarFormat = format;
-                          });
-                        }
-                      },
-                      onPageChanged: (focusedDay) {
-                        _focusedDay = focusedDay;
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  widget.bookingExplanation ??
-                      Wrap(
-                        alignment: WrapAlignment.spaceAround,
-                        spacing: 8.0,
-                        runSpacing: 8.0,
-                        direction: Axis.horizontal,
-                        children: [
-                          BookingExplanation(
-                              color: widget.availableSlotColor ??
-                                  Colors.greenAccent,
-                              text: widget.availableSlotText ?? "Available"),
-                          BookingExplanation(
-                              color: widget.selectedSlotColor ??
-                                  Colors.orangeAccent,
-                              text: widget.selectedSlotText ?? "Selected"),
-                          BookingExplanation(
-                              color: widget.bookedSlotColor ?? Colors.redAccent,
-                              text: widget.bookedSlotText ?? "Booked"),
-                          if (widget.hideBreakTime != null &&
-                              widget.hideBreakTime == false)
-                            BookingExplanation(
-                                color: widget.pauseSlotColor ?? Colors.grey,
-                                text: widget.pauseSlotText ?? "Break"),
-                        ],
+                    return isEnabled;
+                  },
+                  locale: widget.locale,
+                  firstDay: calculateFirstDay(),
+                  lastDay: widget.lastDay ??
+                      DateTime.now().add(const Duration(days: 1000)),
+                  focusedDay: _focusedDay,
+                  calendarFormat: _calendarFormat,
+                  calendarStyle: widget.calendarStyle ??
+                      CalendarStyle(
+                        isTodayHighlighted: true,
+                        selectedDecoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        todayDecoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                  const SizedBox(height: 8),
-                  StreamBuilder<dynamic>(
-                    stream: widget.getBookingStream(
-                        start: startOfDay, end: endOfDay),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return widget.errorWidget ??
-                            Center(
-                              child: Text(snapshot.error.toString()),
-                            );
-                      }
+                  selectedDayPredicate: (day) {
+                    return isSameDay(_selectedDay, day);
+                  },
+                  onDaySelected: (selectedDay, focusedDay) {
+                    if (!isSameDay(_selectedDay, selectedDay)) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                      });
+                      selectNewDateRange();
+                    }
+                  },
+                  onFormatChanged: (format) {
+                    if (_calendarFormat != format) {
+                      setState(() {
+                        _calendarFormat = format;
+                      });
+                    }
+                  },
+                  onPageChanged: (focusedDay) {
+                    _focusedDay = focusedDay;
+                  },
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            SliverToBoxAdapter(
+              child: widget.bookingExplanation ??
+                  Wrap(
+                    alignment: WrapAlignment.spaceAround,
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    direction: Axis.horizontal,
+                    children: [
+                      BookingExplanation(
+                          color: widget.availableSlotColor ??
+                              getAvailableSlotColor(isDarkMode),
+                          text: widget.availableSlotText ?? "Available"),
+                      BookingExplanation(
+                          color: widget.selectedSlotColor ??
+                              Theme.of(context).primaryColor,
+                          text: widget.selectedSlotText ?? "Selected"),
+                      BookingExplanation(
+                          color: widget.bookedSlotColor ??
+                              getBookedColor(isDarkMode),
+                          text: widget.bookedSlotText ?? "Booked"),
+                      if (widget.hideBreakTime != null &&
+                          widget.hideBreakTime == false)
+                        BookingExplanation(
+                            color: widget.pauseSlotColor ?? Colors.grey,
+                            text: widget.pauseSlotText ?? "Break"),
+                    ],
+                  ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            SliverFillRemaining(
+              child: StreamBuilder<dynamic>(
+                stream:
+                    widget.getBookingStream(start: startOfDay, end: endOfDay),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return widget.errorWidget ??
+                        Center(
+                          child: Text(snapshot.error.toString()),
+                        );
+                  }
 
-                      if (!snapshot.hasData) {
-                        return widget.loadingWidget ??
-                            const Center(child: CircularProgressIndicator());
-                      }
+                  if (!snapshot.hasData) {
+                    return widget.loadingWidget ??
+                        const Center(child: CircularProgressIndicator());
+                  }
 
-                      ///this snapshot should be converted to List<DateTimeRange>
-                      final data = snapshot.requireData;
-                      controller.generateBookedSlots(
-                          widget.convertStreamResultToDateTimeRanges(
-                              streamResult: data));
+                  ///this snapshot should be converted to List<DateTimeRange>
+                  final data = snapshot.requireData;
+                  controller.generateBookedSlots(widget
+                      .convertStreamResultToDateTimeRanges(streamResult: data));
+                  // return Container();
 
-                      return Expanded(
-                        child: (widget.wholeDayIsBookedWidget != null &&
-                                controller.isWholeDayBooked())
-                            ? widget.wholeDayIsBookedWidget!
-                            : GridView.builder(
-                                physics: widget.gridScrollPhysics ??
-                                    const BouncingScrollPhysics(),
-                                itemCount: controller.allBookingSlots.length,
-                                itemBuilder: (context, index) {
-                                  TextStyle? getTextStyle() {
-                                    if (controller.isSlotBooked(index)) {
-                                      return widget.bookedSlotTextStyle;
-                                    } else if (index ==
-                                        controller.selectedSlot) {
-                                      return widget.selectedSlotTextStyle;
-                                    } else {
-                                      return widget.availableSlotTextStyle;
-                                    }
-                                  }
+                  return (widget.wholeDayIsBookedWidget != null &&
+                          controller.isWholeDayBooked())
+                      ? widget.wholeDayIsBookedWidget!
+                      : GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: controller.allBookingSlots.length,
+                          itemBuilder: (context, index) {
+                            TextStyle? getTextStyle() {
+                              if (controller.isSlotBooked(index)) {
+                                return widget.bookedSlotTextStyle;
+                              } else if (index == controller.selectedSlot) {
+                                return widget.selectedSlotTextStyle;
+                              } else {
+                                return widget.availableSlotTextStyle;
+                              }
+                            }
 
-                                  final slot = controller.allBookingSlots
-                                      .elementAt(index);
-                                  return BookingSlot(
-                                    hideBreakSlot: widget.hideBreakTime,
-                                    pauseSlotColor: widget.pauseSlotColor,
-                                    availableSlotColor:
-                                        widget.availableSlotColor,
-                                    bookedSlotColor: widget.bookedSlotColor,
-                                    selectedSlotColor: widget.selectedSlotColor,
-                                    isPauseTime:
-                                        controller.isSlotInPauseTime(slot),
-                                    isBooked: controller.isSlotBooked(index),
-                                    isSelected:
-                                        index == controller.selectedSlot,
-                                    onTap: () => controller.selectSlot(index),
-                                    child: Center(
-                                      child: Text(
-                                        widget.formatDateTime?.call(slot) ??
-                                            BookingUtil.formatDateTime(slot),
-                                        style: getTextStyle(),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount:
-                                      widget.bookingGridCrossAxisCount ?? 3,
-                                  childAspectRatio:
-                                      widget.bookingGridChildAspectRatio ?? 1.5,
+                            final slot =
+                                controller.allBookingSlots.elementAt(index);
+                            return BookingSlot(
+                              hideBreakSlot: widget.hideBreakTime,
+                              pauseSlotColor: widget.pauseSlotColor,
+                              availableSlotColor: widget.availableSlotColor,
+                              bookedSlotColor: widget.bookedSlotColor,
+                              selectedSlotColor: widget.selectedSlotColor,
+                              isPauseTime:
+                                  controller.isSlotInPauseTime(slot, index),
+                              isBooked: controller.isSlotBooked(index),
+                              isSelected: index == controller.selectedSlot,
+                              onTap: () {
+                                if (controller.isSlotBooked(index)) {
+                                  return;
+                                }
+                                controller.select(index);
+                                widget.onBookChange?.call(controller.value);
+                              },
+                              child: Center(
+                                child: Text(
+                                  widget.formatDateTime?.call(slot) ??
+                                      BookingUtil.formatDateTime(slot),
+                                  style: getTextStyle() ??
+                                      Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onPrimary,
+                                          ),
                                 ),
                               ),
-                      );
-                    },
-                  ),
-                  const SizedBox(
-                    height: 16,
-                  ),
-                  CommonButton(
-                    text: widget.bookingButtonText ?? 'BOOK',
-                    onTap: () async {
-                      controller.toggleUploading();
-                      await widget.uploadBooking(
-                          newBooking:
-                              controller.generateNewBookingForUploading());
-                      controller.toggleUploading();
-                      controller.resetSelectedSlot();
-                    },
-                    isDisabled: controller.selectedSlot == -1,
-                    buttonActiveColor: widget.bookingButtonColor,
-                  ),
-                ],
+                            );
+                          },
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount:
+                                widget.bookingGridCrossAxisCount ?? 3,
+                            childAspectRatio:
+                                widget.bookingGridChildAspectRatio ?? 1.5,
+                          ),
+                        );
+                },
               ),
+            ),
+            // const SizedBox(
+            //   height: 16,
+            // ),
+            // CommonButton(
+            //   text: widget.bookingButtonText ?? 'BOOK',
+            //   onPressed: () async {
+            //     // controller.toggleUploading();
+            //     await widget.onBookSelected
+            //         ?.call(controller.generateNewBookingForUploading());
+            //     // controller.toggleUploading();
+            //     if (context.mounted) {
+            //       controller.resetSelectedSlot();
+            //     }
+            //   },
+            //   isDisabled: controller.selectedSlot == -1,
+            //   buttonActiveColor: widget.bookingButtonColor,
+            // ),
+          ],
+        ),
       ),
     );
   }
